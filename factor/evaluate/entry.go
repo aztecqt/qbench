@@ -12,8 +12,8 @@ import (
 	"math"
 	"slices"
 
-	"github.com/aztecqt/bench/common"
 	"github.com/aztecqt/dagger/util"
+	"github.com/aztecqt/qbench/common"
 )
 
 // 对应alphalens的get_clean_factor_and_forward_returns

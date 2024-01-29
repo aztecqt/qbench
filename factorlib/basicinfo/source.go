@@ -10,7 +10,7 @@ package basicinfo
 import (
 	"time"
 
-	"github.com/aztecqt/bench/common"
+	"github.com/aztecqt/qbench/common"
 	"github.com/go-gota/gota/dataframe"
 )
 

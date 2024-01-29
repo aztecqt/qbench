@@ -11,10 +11,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aztecqt/bench/common"
-	"github.com/aztecqt/bench/data/local"
-	"github.com/aztecqt/bench/data/online"
 	"github.com/aztecqt/dagger/stratergy"
+	"github.com/aztecqt/qbench/common"
+	"github.com/aztecqt/qbench/data/local"
+	"github.com/aztecqt/qbench/data/online"
 )
 
 // 针对一组标的，获取中心化交易所的价格数据

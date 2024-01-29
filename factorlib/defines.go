@@ -10,9 +10,9 @@ package factorlib
 import (
 	"time"
 
-	"github.com/aztecqt/bench/common"
 	"github.com/aztecqt/dagger/util"
 	"github.com/aztecqt/dagger/util/influxdb"
+	"github.com/aztecqt/qbench/common"
 )
 
 var logPrefix = "factorlib"

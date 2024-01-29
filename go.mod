@@ -1,4 +1,4 @@
-module github.com/aztecqt/bench
+module github.com/aztecqt/qbench
 
 go 1.21.5
 
@@ -7,7 +7,6 @@ replace github.com/aztecqt/dagger => ../../../quant/go/src/dagger
 require (
 	github.com/aztecqt/dagger v1.0.4
 	github.com/go-gota/gota v0.12.0
-	github.com/jedib0t/go-pretty/v6 v6.4.9
 )
 
 require (

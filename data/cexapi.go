@@ -10,12 +10,12 @@ package data
 import (
 	"strings"
 
-	"github.com/aztecqt/bench/common"
 	"github.com/aztecqt/dagger/api/binanceapi/binancefutureapi"
 	"github.com/aztecqt/dagger/api/binanceapi/binancespotapi"
 	"github.com/aztecqt/dagger/api/coingeckoapi"
 	"github.com/aztecqt/dagger/api/okexv5api"
 	"github.com/aztecqt/dagger/util"
+	"github.com/aztecqt/qbench/common"
 )
 
 // 交易品种

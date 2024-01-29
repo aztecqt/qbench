@@ -10,12 +10,12 @@ package basicinfo
 import (
 	"time"
 
-	"github.com/aztecqt/bench/common"
 	"github.com/aztecqt/dagger/api/binanceapi"
 	"github.com/aztecqt/dagger/api/binanceapi/binancefutureapi"
 	"github.com/aztecqt/dagger/api/binanceapi/binancespotapi"
 	"github.com/aztecqt/dagger/api/binanceapi/cachedBn"
 	"github.com/aztecqt/dagger/util"
+	"github.com/aztecqt/qbench/common"
 	"github.com/go-gota/gota/dataframe"
 	"github.com/go-gota/gota/series"
 )

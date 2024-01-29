@@ -10,10 +10,10 @@ package online
 import (
 	"time"
 
-	"github.com/aztecqt/bench/common"
 	"github.com/aztecqt/dagger/api/binanceapi"
 	"github.com/aztecqt/dagger/api/binanceapi/cachedBn"
 	"github.com/aztecqt/dagger/api/okexv5api/cachedOk"
+	"github.com/aztecqt/qbench/common"
 )
 
 func LoadKline(t0, t1 time.Time, ex common.ExName, instType common.InstType, instId string, interval int) *common.KLine {

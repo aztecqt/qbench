@@ -10,8 +10,8 @@ package data
 import (
 	"slices"
 
-	"github.com/aztecqt/bench/common"
 	"github.com/aztecqt/dagger/util"
+	"github.com/aztecqt/qbench/common"
 )
 
 // 根据24小时成交量（交易所内）选取InstId

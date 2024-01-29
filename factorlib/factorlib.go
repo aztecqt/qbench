@@ -11,9 +11,9 @@ package factorlib
 import (
 	"time"
 
-	"github.com/aztecqt/bench/factorlib/basicinfo"
 	"github.com/aztecqt/dagger/util"
 	"github.com/aztecqt/dagger/util/influxdb"
+	"github.com/aztecqt/qbench/factorlib/basicinfo"
 	"github.com/influxdata/influxdb/client/v2"
 )
 
