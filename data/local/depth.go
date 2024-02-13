@@ -28,10 +28,13 @@ func GetValidDepthTimeRange(ex common.ExName, instId string) (t0, t1 time.Time, 
 }
 
 // 加载深度
-func LoadDepth(t0, t1 time.Time, ex common.ExName, instId string) []common.Depth {
+// 填写cacheGroup则本地保存解压后的缓存，以提升速度
+func LoadDepth(t0, t1 time.Time, ex common.ExName, instId string, fnprg func(i, n int)) []common.Depth {
 	dt0 := util.DateOfTime(t0)
 	dt1 := util.DateOfTime(t1)
 	depths := []common.Depth{}
+	i := 0
+	n := int(dt1.Sub(dt0).Hours()/24) + 1
 	for d := dt0; d.Unix() <= dt1.Unix(); d = d.AddDate(0, 0, 1) {
 		path := fmt.Sprintf("%s/depth/%s/%s/%s.depth", LocalDataPath, ex, instId, d.Format(time.DateOnly))
 		if bf, err := LoadZipOrRawFile(path); err == nil {
@@ -44,6 +47,11 @@ func LoadDepth(t0, t1 time.Time, ex common.ExName, instId string) []common.Depth
 					}
 					return dp.Time.UnixMilli() < t1.UnixMilli()
 				})
+		}
+
+		i++
+		if fnprg != nil {
+			fnprg(i, n)
 		}
 	}
 

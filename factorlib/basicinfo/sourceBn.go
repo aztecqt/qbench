@@ -13,7 +13,7 @@ import (
 	"github.com/aztecqt/dagger/api/binanceapi"
 	"github.com/aztecqt/dagger/api/binanceapi/binancefutureapi"
 	"github.com/aztecqt/dagger/api/binanceapi/binancespotapi"
-	"github.com/aztecqt/dagger/api/binanceapi/cachedBn"
+	"github.com/aztecqt/dagger/api/binanceapi/cachedbn"
 	"github.com/aztecqt/dagger/util"
 	"github.com/aztecqt/qbench/common"
 	"github.com/go-gota/gota/dataframe"
@@ -107,14 +107,14 @@ func (s *SourceBn) GetDataSince(instId string, intervalSec int, since time.Time)
 		volumes := series.New(nil, series.Float, "volume")
 		kus := []binanceapi.KLineUnit{}
 		if instType == common.InstType_Spot {
-			if v, ok := cachedBn.GetSpotKline(instId, since.Add(time.Millisecond), time.Now(), intervalSec, nil); ok {
+			if v, ok := cachedbn.GetSpotKline(instId, since.Add(time.Millisecond), time.Now(), intervalSec, nil); ok {
 				kus = v
 			} else {
 				common.LogError(s.logPrefix, "get binance spot kline failed")
 				return nil, false
 			}
 		} else {
-			if v, ok := cachedBn.GetFutureKline(instId, since.Add(time.Millisecond), time.Now(), intervalSec, nil); ok {
+			if v, ok := cachedbn.GetFutureKline(instId, since.Add(time.Millisecond), time.Now(), intervalSec, nil); ok {
 				kus = v
 			} else {
 				common.LogError(s.logPrefix, "get binance future kline failed")

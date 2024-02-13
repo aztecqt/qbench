@@ -27,19 +27,21 @@ type Instrument struct {
 }
 
 // 获取所有交易品种（现货仅取usdt交易对）
-func GetAllInstruments(exName common.ExName, symbolType common.InstType, withMarketcap bool) (insts []Instrument, ok bool) {
+func GetAllInstruments(exName common.ExName, instType common.InstType, withMarketcap bool) (insts []Instrument, ok bool) {
 	insts = []Instrument{}
 	ok = false
 	switch exName {
 	case common.ExName_Okx:
-		if okSymbolType, valid := common.CommonInstType2Okx(symbolType); valid {
+		if okSymbolType, valid := common.CommonInstType2Okx(instType); valid {
 			if resp, err := okexv5api.GetTickers(okSymbolType); err == nil && resp.Code == "0" {
 				for _, tr := range resp.Data {
-					if symbolType == common.InstType_Spot && util.StringEndWith(tr.InstId, "USDT") ||
-						symbolType == common.InstType_CmSwap && util.StringEndWith(tr.InstId, "USD-SWAP") ||
-						symbolType == common.InstType_UmSwap && util.StringEndWith(tr.InstId, "USDT-SWAP") {
+					if instType == common.InstType_Spot && util.StringEndWith(tr.InstId, "USDT") ||
+						instType == common.InstType_CmSwap && util.StringEndWith(tr.InstId, "USD-SWAP") ||
+						instType == common.InstType_UmSwap && util.StringEndWith(tr.InstId, "USDT-SWAP") {
 						baseCcy := strings.ToLower(strings.Split(tr.InstId, "-")[0])
-						insts = append(insts, Instrument{Id: tr.InstId, BaseCurrency: baseCcy, Vol24h: tr.VolUsd24h.InexactFloat64()})
+						if commonInstId, ok := common.ToCommonInstId(exName, instType, tr.InstId); ok {
+							insts = append(insts, Instrument{Id: commonInstId, BaseCurrency: baseCcy, Vol24h: tr.VolUsd24h.InexactFloat64()})
+						}
 					}
 				}
 				ok = true
@@ -48,13 +50,15 @@ func GetAllInstruments(exName common.ExName, symbolType common.InstType, withMar
 			}
 		}
 	case common.ExName_Binance:
-		if symbolType == common.InstType_Spot {
+		if instType == common.InstType_Spot {
 			if resp, err := binancespotapi.Get24hrTicker(); err == nil {
 				s := *resp
 				for _, t := range s {
 					if util.StringEndWith(t.Symbol, "USDT") {
 						baseCcy := strings.ToLower(strings.ReplaceAll(t.Symbol, "USDT", ""))
-						insts = append(insts, Instrument{Id: t.Symbol, BaseCurrency: baseCcy, Vol24h: t.VolumeQuote.InexactFloat64()})
+						if commonInstId, ok := common.ToCommonInstId(exName, instType, t.Symbol); ok {
+							insts = append(insts, Instrument{Id: commonInstId, BaseCurrency: baseCcy, Vol24h: t.VolumeQuote.InexactFloat64()})
+						}
 					}
 				}
 				ok = true
@@ -62,20 +66,24 @@ func GetAllInstruments(exName common.ExName, symbolType common.InstType, withMar
 				common.LogError("get instruments from okx failed: %s", err.Error())
 			}
 		} else {
-			ac := util.ValueIf(symbolType == common.InstType_CmSwap, binancefutureapi.API_ClassicUsd, binancefutureapi.API_ClassicUsdt)
+			ac := util.ValueIf(instType == common.InstType_CmSwap, binancefutureapi.API_ClassicUsd, binancefutureapi.API_ClassicUsdt)
 			if resp, err := binancefutureapi.Get24hrTicker(ac); err == nil {
 				s := *resp
 				for _, t := range s {
 					if util.StringEndWith(t.Symbol, "USDT") {
 						baseCcy := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(t.Symbol, "USDT", ""), "1000", ""))
-						insts = append(insts, Instrument{Id: t.Symbol, BaseCurrency: baseCcy, Vol24h: t.VolumeQuote.InexactFloat64()})
+						if commonInstId, ok := common.ToCommonInstId(exName, instType, t.Symbol); ok {
+							insts = append(insts, Instrument{Id: commonInstId, BaseCurrency: baseCcy, Vol24h: t.VolumeQuote.InexactFloat64()})
+						}
 					} else if util.StringEndWith(t.Symbol, "USD_PERP") {
 						ctval := 10.0
 						if t.Symbol == "BTCUSD_PERP" {
 							ctval = 100
 						}
 						baseCcy := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(t.Symbol, "USD_PERP", ""), "1000", ""))
-						insts = append(insts, Instrument{Id: t.Symbol, BaseCurrency: baseCcy, Vol24h: t.Volume.InexactFloat64() * ctval})
+						if commonInstId, ok := common.ToCommonInstId(exName, instType, t.Symbol); ok {
+							insts = append(insts, Instrument{Id: commonInstId, BaseCurrency: baseCcy, Vol24h: t.Volume.InexactFloat64() * ctval})
+						}
 					}
 				}
 				ok = true

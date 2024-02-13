@@ -11,12 +11,14 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
+	"math"
 	"slices"
 	"strings"
 	"time"
 
 	"github.com/aztecqt/dagger/util"
 	"github.com/jedib0t/go-pretty/table"
+	"github.com/shopspring/decimal"
 )
 
 type FnLog func(format string, args ...interface{})
@@ -130,6 +132,26 @@ func GetInstType(instId string) InstType {
 	}
 }
 
+// 是否为U本位合约
+func IsUsdtContract(instId string) bool {
+	return util.StringEndWith(instId, "_usdt_swap")
+}
+
+// 获取合约的保证金币种
+func InstId2MarginCcy(instId string) string {
+	if IsUsdtContract(instId) {
+		return "usdt"
+	} else {
+		return strings.Split(instId, "_")[0]
+	}
+}
+
+// 获取现货instId的交易币种
+func InstId2Ccys(instId string) (baseCcy, quoteCcy string) {
+	ss := strings.Split(instId, "_")
+	return ss[0], ss[1]
+}
+
 // 截面数据
 // 某一时刻各个品种的某一数据
 type SectionData struct {
@@ -211,11 +233,11 @@ func (s SectionSequence) ToTable(n int) table.Writer {
 // k线单位(跟MarketCollector保持一致)
 type KlineUnit struct {
 	Time       time.Time
-	OpenPrice  float64
-	ClosePrice float64
-	HighPrice  float64
-	LowPrice   float64
-	Volume     float64
+	OpenPrice  decimal.Decimal
+	ClosePrice decimal.Decimal
+	HighPrice  decimal.Decimal
+	LowPrice   decimal.Decimal
+	Volume     decimal.Decimal
 }
 
 func (k *KlineUnit) Deserialize(r io.Reader) bool {
@@ -225,25 +247,31 @@ func (k *KlineUnit) Deserialize(r io.Reader) bool {
 	}
 	k.Time = time.UnixMilli(ts)
 
-	if e := binary.Read(r, binary.LittleEndian, &k.OpenPrice); e != nil {
+	val := 0.0
+	if e := binary.Read(r, binary.LittleEndian, &val); e != nil {
 		return false
 	}
+	k.OpenPrice = decimal.NewFromFloat(val)
 
-	if e := binary.Read(r, binary.LittleEndian, &k.ClosePrice); e != nil {
+	if e := binary.Read(r, binary.LittleEndian, &val); e != nil {
 		return false
 	}
+	k.ClosePrice = decimal.NewFromFloat(val)
 
-	if e := binary.Read(r, binary.LittleEndian, &k.LowPrice); e != nil {
+	if e := binary.Read(r, binary.LittleEndian, &val); e != nil {
 		return false
 	}
+	k.LowPrice = decimal.NewFromFloat(val)
 
-	if e := binary.Read(r, binary.LittleEndian, &k.HighPrice); e != nil {
+	if e := binary.Read(r, binary.LittleEndian, &val); e != nil {
 		return false
 	}
+	k.HighPrice = decimal.NewFromFloat(val)
 
-	if e := binary.Read(r, binary.LittleEndian, &k.Volume); e != nil {
+	if e := binary.Read(r, binary.LittleEndian, &val); e != nil {
 		return false
 	}
+	k.Volume = decimal.NewFromFloat(val)
 
 	return true
 }
@@ -289,19 +317,21 @@ func Bar2Interval(bar Bar) (int, bool) {
 	}
 }
 
+// Ticker
 type Ticker struct {
-	InstrumentId string  `json:"inst"`
-	TimeStamp    int64   `json:"ts"`
-	Price        float64 `json:"px"`
-	Buy1         float64 `json:"b1"`
-	Sell1        float64 `json:"s1"`
+	InstrumentId string          `json:"inst"`
+	TimeStamp    int64           `json:"ts"`
+	Price        decimal.Decimal `json:"px"`
+	Buy1         decimal.Decimal `json:"b1"`
+	Sell1        decimal.Decimal `json:"s1"`
+	Time         time.Time
 }
 
 func (t *Ticker) Serialize(w io.Writer) {
 	binary.Write(w, binary.LittleEndian, t.TimeStamp)
-	binary.Write(w, binary.LittleEndian, t.Price)
-	binary.Write(w, binary.LittleEndian, t.Buy1)
-	binary.Write(w, binary.LittleEndian, t.Sell1)
+	binary.Write(w, binary.LittleEndian, t.Price.InexactFloat64())
+	binary.Write(w, binary.LittleEndian, t.Buy1.InexactFloat64())
+	binary.Write(w, binary.LittleEndian, t.Sell1.InexactFloat64())
 }
 
 func (t *Ticker) Deserialize(r io.Reader) bool {
@@ -309,53 +339,63 @@ func (t *Ticker) Deserialize(r io.Reader) bool {
 		return false
 	}
 
-	if binary.Read(r, binary.LittleEndian, &t.Price) != nil {
+	val := 0.0
+	if binary.Read(r, binary.LittleEndian, &val) != nil {
 		return false
 	}
+	t.Price = decimal.NewFromFloat(val)
 
-	if binary.Read(r, binary.LittleEndian, &t.Buy1) != nil {
+	if binary.Read(r, binary.LittleEndian, &val) != nil {
 		return false
 	}
+	t.Buy1 = decimal.NewFromFloat(val)
 
-	if binary.Read(r, binary.LittleEndian, &t.Sell1) != nil {
+	if binary.Read(r, binary.LittleEndian, &val) != nil {
 		return false
 	}
+	t.Sell1 = decimal.NewFromFloat(val)
+
+	t.Time = time.UnixMilli(t.TimeStamp)
 
 	return true
 }
 
 // 订单簿
+// 为了提升加载速度，这里使用float存储
+// 运算时要注意精度
 type DepthUnit struct {
-	Price      float64
-	Amount     float64
+	Price      decimal.Decimal
+	Amount     decimal.Decimal
 	OrderCount int16
 }
 
 type Depth struct {
-	Time time.Time
-	Asks []DepthUnit
-	Bids []DepthUnit
+	Time  time.Time
+	Asks  []DepthUnit
+	Bids  []DepthUnit
+	Sell1 decimal.Decimal
+	Buy1  decimal.Decimal
+	Mid   decimal.Decimal
 }
 
-func (d Depth) Serialize(w io.Writer) bool {
-	if len(d.Asks) != len(d.Bids) {
-		fmt.Println("depth length not match")
+func NewDepthFromTicker(t Ticker) Depth {
+	d := Depth{}
+	d.Time = t.Time
+	d.Asks = append(d.Asks, DepthUnit{Price: t.Sell1, Amount: decimal.NewFromInt32(math.MaxInt32), OrderCount: 1})
+	d.Bids = append(d.Bids, DepthUnit{Price: t.Buy1, Amount: decimal.NewFromInt32(math.MaxInt32), OrderCount: 1})
+	d.parse()
+	return d
+}
+
+func (d *Depth) parse() bool {
+	if len(d.Bids) > 0 && len(d.Asks) > 0 {
+		d.Buy1 = d.Bids[0].Price
+		d.Sell1 = d.Asks[0].Price
+		d.Mid = d.Buy1.Add(d.Sell1).Div(util.DecimalTwo)
+		return true
+	} else {
 		return false
 	}
-
-	binary.Write(w, binary.LittleEndian, d.Time.UnixMilli())
-
-	l := int8(len(d.Asks))
-	binary.Write(w, binary.LittleEndian, l)
-	for i := 0; i < int(l); i++ {
-		binary.Write(w, binary.LittleEndian, d.Asks[i].Price)
-		binary.Write(w, binary.LittleEndian, d.Asks[i].Amount)
-		binary.Write(w, binary.LittleEndian, d.Asks[i].OrderCount)
-		binary.Write(w, binary.LittleEndian, d.Bids[i].Price)
-		binary.Write(w, binary.LittleEndian, d.Bids[i].Amount)
-		binary.Write(w, binary.LittleEndian, d.Bids[i].OrderCount)
-	}
-	return true
 }
 
 func (d *Depth) Deserialize(r io.Reader) bool {
@@ -370,42 +410,105 @@ func (d *Depth) Deserialize(r io.Reader) bool {
 		d.Asks = make([]DepthUnit, l)
 		d.Bids = make([]DepthUnit, l)
 		for i := 0; i < int(l); i++ {
-			if binary.Read(r, binary.LittleEndian, &d.Asks[i].Price) != nil {
+			val := 0.0
+			if binary.Read(r, binary.LittleEndian, &val) != nil {
 				return false
 			}
+			d.Asks[i].Price = decimal.NewFromFloat(val)
 
-			if binary.Read(r, binary.LittleEndian, &d.Asks[i].Amount) != nil {
+			if binary.Read(r, binary.LittleEndian, &val) != nil {
 				return false
 			}
+			d.Asks[i].Amount = decimal.NewFromFloat(val)
 
 			if binary.Read(r, binary.LittleEndian, &d.Asks[i].OrderCount) != nil {
 				return false
 			}
 
-			if binary.Read(r, binary.LittleEndian, &d.Bids[i].Price) != nil {
+			if binary.Read(r, binary.LittleEndian, &val) != nil {
 				return false
 			}
+			d.Bids[i].Price = decimal.NewFromFloat(val)
 
-			if binary.Read(r, binary.LittleEndian, &d.Bids[i].Amount) != nil {
+			if binary.Read(r, binary.LittleEndian, &val) != nil {
 				return false
 			}
+			d.Bids[i].Amount = decimal.NewFromFloat(val)
 
 			if binary.Read(r, binary.LittleEndian, &d.Bids[i].OrderCount) != nil {
 				return false
 			}
 		}
-		return true
+
+		return d.parse()
 	} else {
 		return false
 	}
 }
 
+// 查询盘口数量
+func (d Depth) GetMaxAmount(price decimal.Decimal, isSell bool) decimal.Decimal {
+	amount := decimal.Zero
+	if isSell {
+		for _, du := range d.Bids {
+			if du.Price.GreaterThanOrEqual(price) {
+				amount = amount.Add(du.Amount)
+			}
+		}
+	} else {
+		for _, du := range d.Asks {
+			if du.Price.LessThanOrEqual(price) {
+				amount = amount.Add(du.Amount)
+			}
+		}
+	}
+
+	return amount
+}
+
+// 预估成交价格
+func (d Depth) GetAvgPrice(amount decimal.Decimal, isSell bool) (avgPrice, amountReal decimal.Decimal) {
+	amountMulPrice := decimal.Zero
+	amountReal = decimal.Zero
+
+	dus := d.Asks
+	if isSell {
+		dus = d.Bids
+	}
+
+	for _, du := range dus {
+		if du.Amount.GreaterThanOrEqual(amount) {
+			amountMulPrice = amountMulPrice.Add(amount.Mul(du.Price))
+			amountReal = amountReal.Add(amount)
+			amount = decimal.Zero
+			break
+		} else {
+			amountMulPrice = amountMulPrice.Add(du.Amount.Mul(du.Price))
+			amountReal = amountReal.Add(du.Amount)
+			amount = amount.Mul(du.Amount)
+		}
+	}
+
+	if amountReal.IsPositive() {
+		avgPrice = amountMulPrice.Div(amountReal)
+	}
+	return
+}
+
+type TradeTag int
+
+const (
+	TradeTagNormal TradeTag = iota
+	TradeTagLiquidation
+)
+
 // 市场成交
 type Trade struct {
 	Time  time.Time
-	Price float64
-	Size  float64
+	Price decimal.Decimal
+	Size  decimal.Decimal
 	Side  byte // 'b','s'
+	Tag   TradeTag
 }
 
 func (t Trade) Serialize(w io.Writer) bool {
@@ -423,13 +526,16 @@ func (t *Trade) Deserialize(r io.Reader) bool {
 	}
 	t.Time = time.UnixMilli(ms)
 
-	if binary.Read(r, binary.LittleEndian, &t.Price) != nil {
+	val := 0.0
+	if binary.Read(r, binary.LittleEndian, &val) != nil {
 		return false
 	}
+	t.Price = decimal.NewFromFloat(val)
 
-	if binary.Read(r, binary.LittleEndian, &t.Size) != nil {
+	if binary.Read(r, binary.LittleEndian, &val) != nil {
 		return false
 	}
+	t.Size = decimal.NewFromFloat(val)
 
 	if binary.Read(r, binary.LittleEndian, &t.Side) != nil {
 		return false

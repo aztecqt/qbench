@@ -11,25 +11,25 @@ import (
 	"time"
 
 	"github.com/aztecqt/dagger/api/binanceapi"
-	"github.com/aztecqt/dagger/api/binanceapi/cachedBn"
-	"github.com/aztecqt/dagger/api/okexv5api/cachedOk"
+	"github.com/aztecqt/dagger/api/binanceapi/cachedbn"
+	"github.com/aztecqt/dagger/api/okexv5api/cachedok"
 	"github.com/aztecqt/qbench/common"
 )
 
 func LoadKline(t0, t1 time.Time, ex common.ExName, instType common.InstType, instId string, interval int) *common.KLine {
 	if ex == common.ExName_Okx {
 		if exInstId, ok := common.ToExchangeInstId(ex, instId); ok {
-			if kus, ok := cachedOk.GetKline(exInstId, t0, t1, interval, nil); ok {
+			if kus, ok := cachedok.GetKline(exInstId, t0, t1, interval, nil); ok {
 				// 格式转换
 				kl := &common.KLine{InstId: instId}
 				for _, ku := range kus {
 					kl.Units = append(kl.Units,
 						common.KlineUnit{
 							Time:       ku.Time,
-							OpenPrice:  ku.Open.InexactFloat64(),
-							ClosePrice: ku.Close.InexactFloat64(),
-							HighPrice:  ku.High.InexactFloat64(),
-							LowPrice:   ku.Low.InexactFloat64(),
+							OpenPrice:  ku.Open,
+							ClosePrice: ku.Close,
+							HighPrice:  ku.High,
+							LowPrice:   ku.Low,
 						})
 				}
 				return kl
@@ -40,9 +40,9 @@ func LoadKline(t0, t1 time.Time, ex common.ExName, instType common.InstType, ins
 			var kus []binanceapi.KLineUnit
 			kusok := false
 			if instType == common.InstType_Spot {
-				kus, kusok = cachedBn.GetSpotKline(exInstId, t0, t1, interval, nil)
+				kus, kusok = cachedbn.GetSpotKline(exInstId, t0, t1, interval, nil)
 			} else {
-				kus, kusok = cachedBn.GetFutureKline(exInstId, t0, t1, interval, nil)
+				kus, kusok = cachedbn.GetFutureKline(exInstId, t0, t1, interval, nil)
 			}
 
 			if kusok {
@@ -52,10 +52,10 @@ func LoadKline(t0, t1 time.Time, ex common.ExName, instType common.InstType, ins
 					kl.Units = append(kl.Units,
 						common.KlineUnit{
 							Time:       ku.Time,
-							OpenPrice:  ku.Open.InexactFloat64(),
-							ClosePrice: ku.Close.InexactFloat64(),
-							HighPrice:  ku.High.InexactFloat64(),
-							LowPrice:   ku.Low.InexactFloat64(),
+							OpenPrice:  ku.Open,
+							ClosePrice: ku.Close,
+							HighPrice:  ku.High,
+							LowPrice:   ku.Low,
 						})
 				}
 				return kl

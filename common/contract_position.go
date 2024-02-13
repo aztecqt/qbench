@@ -81,8 +81,12 @@ func NewContractPosition(feeRateMaker, feeRateTaker decimal.Decimal, isUsdt, ena
 //	空仓收益率 = （开仓价格-平仓价格）/平仓均价
 //	收益率 * 保证金数量 = 利润（币）
 func (c *ContractPosition) calProfit(openPx, closePx decimal.Decimal, amount decimal.Decimal) (decimal.Decimal, decimal.Decimal) {
+	if openPx.IsZero() || closePx.IsZero() || amount.IsZero() {
+		return decimal.Zero, decimal.Zero
+	}
+
 	if c.isUsdt {
-		margin := amount.Mul(openPx)
+		margin := amount.Abs().Mul(openPx)
 		if amount.IsNegative() {
 			// 平仓数量为负，说明为平多
 			profitRate := closePx.Sub(openPx).Div(openPx)
@@ -93,7 +97,7 @@ func (c *ContractPosition) calProfit(openPx, closePx decimal.Decimal, amount dec
 			return profitRate, profitRate.Mul(margin)
 		}
 	} else {
-		margin := amount.Div(openPx)
+		margin := amount.Abs().Div(openPx)
 		if amount.IsNegative() {
 			// 平仓数量为负，说明为平多
 			profitRate := closePx.Sub(openPx).Div(closePx)
@@ -150,10 +154,10 @@ func (c *ContractPosition) TotalProfit() decimal.Decimal {
 // 记录一次交易
 // amount正数为买入，负数为卖出
 // fnPosClear为完全平仓时的回调。一般不用传。
-func (c *ContractPosition) Deal(price decimal.Decimal, amount decimal.Decimal, taker bool, t time.Time, fnPosClear func()) {
+func (c *ContractPosition) Deal(price decimal.Decimal, amount decimal.Decimal, taker bool, t time.Time, fnPosClear func()) (fee, profit decimal.Decimal) {
 	amountAbs := amount.Abs()
 	positionAbs := c.Position.Abs()
-	if amount.IsPositive() && c.Position.IsPositive() || amount.IsNegative() && c.Position.IsNegative() {
+	if amount.IsPositive() && !c.Position.IsNegative() || amount.IsNegative() && !c.Position.IsPositive() {
 		// 开仓情况，更新总仓位，开仓均价，最大仓位
 		if c.Position.IsZero() {
 			// 全新仓位
@@ -190,7 +194,7 @@ func (c *ContractPosition) Deal(price decimal.Decimal, amount decimal.Decimal, t
 		// 计算已实现盈亏
 		openPrice := c.PositionAvgPriceOpen
 		closePrice := price
-		_, profit := c.calProfit(openPrice, closePrice, amount)
+		_, profit = c.calProfit(openPrice, closePrice, amount)
 		c.RealizedProfit = c.RealizedProfit.Add(profit)
 
 		// 计算平仓均价（这里稍微有点绕）
@@ -231,7 +235,8 @@ func (c *ContractPosition) Deal(price decimal.Decimal, amount decimal.Decimal, t
 	}
 
 	// 计算手续费
-	c.TotalFee = c.TotalFee.Add(c.calFee(price, amount, taker))
+	fee = c.calFee(price, amount, taker)
+	c.TotalFee = c.TotalFee.Add(fee)
 
 	// 计算整体买入/卖出均价
 	if amount.IsPositive() {
@@ -247,6 +252,8 @@ func (c *ContractPosition) Deal(price decimal.Decimal, amount decimal.Decimal, t
 	} else {
 		c.TotalVolume = c.TotalVolume.Add(amountAbs.Div(price))
 	}
+
+	return
 }
 
 // 根据当前价格，重新计算未实现盈亏

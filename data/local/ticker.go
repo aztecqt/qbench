@@ -28,10 +28,12 @@ func GetValidTickerTimeRange(ex common.ExName, instId string) (t0, t1 time.Time,
 }
 
 // 加载tickers
-func LoadTickers(t0, t1 time.Time, ex common.ExName, instId string) []common.Ticker {
+func LoadTickers(t0, t1 time.Time, ex common.ExName, instId string, fnprg func(i, n int)) []common.Ticker {
 	dt0 := util.DateOfTime(t0)
 	dt1 := util.DateOfTime(t1)
 	tickers := []common.Ticker{}
+	i := 0
+	n := int(dt1.Sub(dt0).Hours()/24) + 1
 	for d := dt0; d.Unix() <= dt1.Unix(); d = d.AddDate(0, 0, 1) {
 		path := fmt.Sprintf("%s/tickers/%s/%s/%s.ticker", LocalDataPath, ex, instId, d.Format(time.DateOnly))
 		if bf, err := LoadZipOrRawFile(path); err == nil {
@@ -44,6 +46,11 @@ func LoadTickers(t0, t1 time.Time, ex common.ExName, instId string) []common.Tic
 					}
 					return tk.TimeStamp < t1.UnixMilli()
 				})
+
+			i++
+			if fnprg != nil {
+				fnprg(i, n)
+			}
 		}
 	}
 

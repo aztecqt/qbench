@@ -26,13 +26,6 @@ func GetPricesFromCEx(exName common.ExName, instType common.InstType, instIds []
 	// step 1: 先尝试取出所有原始价格
 	dlPrices := map[string]*stratergy.DataLine{}
 	for _, instId := range instIds {
-		if v, ok := common.ToCommonInstId(exName, instType, instId); ok {
-			instId = v
-		} else {
-			common.LogError(logPrefix, "convert %s to common inst id failed", instId)
-			continue
-		}
-
 		// 尝试从本地加载
 		validRange := local.GetValidKlineBarsAndTimeRange(exName, instId)
 		selectedInterval := 0
@@ -49,8 +42,8 @@ func GetPricesFromCEx(exName common.ExName, instType common.InstType, instIds []
 		var kl *common.KLine
 		if selectedInterval > 0 && n > 0 {
 			// 尝试加载本地数据（本地数据采用通用instId）
-			kl = local.LoadKLine(t0, t1, exName, instId, selectedInterval)
-			kl = local.LoadKLine(t0, t1, exName, instId, selectedInterval)
+			kl = local.LoadKLine(t0, t1, exName, instId, selectedInterval, nil)
+			kl = local.LoadKLine(t0, t1, exName, instId, selectedInterval, nil)
 			if kl == nil {
 				common.LogNormal(logPrefix, "load %s(%s) local data failed", instId, string(exName))
 			} else {
@@ -60,7 +53,7 @@ func GetPricesFromCEx(exName common.ExName, instType common.InstType, instIds []
 					dl := &stratergy.DataLine{}
 					dl.Init("", 0, int64(intervalSec)*1000, 0)
 					for i := 0; i < len(kl.Units); i += n {
-						dl.Update(kl.Units[i].Time.UnixMilli(), kl.Units[i].OpenPrice)
+						dl.Update(kl.Units[i].Time.UnixMilli(), kl.Units[i].OpenPrice.InexactFloat64())
 					}
 					dlPrices[instId] = dl
 				}
@@ -80,7 +73,7 @@ func GetPricesFromCEx(exName common.ExName, instType common.InstType, instIds []
 				dl := &stratergy.DataLine{}
 				dl.Init("", 0, int64(intervalSec)*1000, 0)
 				for i := 0; i < len(kl.Units); i++ {
-					dl.Update(kl.Units[i].Time.UnixMilli(), kl.Units[i].OpenPrice)
+					dl.Update(kl.Units[i].Time.UnixMilli(), kl.Units[i].OpenPrice.InexactFloat64())
 				}
 				dlPrices[instId] = dl
 			}

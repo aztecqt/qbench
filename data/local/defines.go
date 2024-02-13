@@ -2,6 +2,7 @@ package local
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -17,7 +18,7 @@ func Init(localDataPath string) {
 }
 
 func OpenZipOrRawFile(path string) (io.ReadCloser, error) {
-	pathz := path + ".zip"
+	pathz := path + ".zlib"
 	if f, err := util.OpenCompressedFile_Zlib(pathz); err == nil {
 		return f, nil
 	} else if f, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm); err == nil {
@@ -28,13 +29,29 @@ func OpenZipOrRawFile(path string) (io.ReadCloser, error) {
 }
 
 func LoadZipOrRawFile(path string) (*bytes.Buffer, error) {
-	pathz := path + ".zip"
+	pathz := path + ".zlib"
 	if bf, n := util.LoadCompressedFile_Zlib(pathz); n > 0 {
 		return bf, nil
 	} else if b, err := os.ReadFile(path); err == nil {
 		return bytes.NewBuffer(b), nil
 	} else {
 		return nil, err
+	}
+}
+
+func LoadZipOrRawFileWithCache(path string, group string) (*bytes.Buffer, error) {
+	if len(group) == 0 {
+		return LoadZipOrRawFile(path)
+	} else {
+		cachePath := fmt.Sprintf("./temp/zipcache/%s/%s", group, util.ConverToFileName(path, "cache"))
+		if b, err := os.ReadFile(cachePath); err == nil {
+			return bytes.NewBuffer(b), nil
+		} else {
+			b, err := LoadZipOrRawFile(path)
+			util.MakeSureDirForFile(cachePath)
+			os.WriteFile(cachePath, b.Bytes(), os.ModePerm)
+			return b, err
+		}
 	}
 }
 
@@ -71,7 +88,7 @@ func GetTimeRangeOfDir(dir string) (t0, t1 time.Time, ok bool) {
 			if !des[i].IsDir() {
 				dateStr := des[i].Name()[:10]
 				if t, err := time.Parse(time.DateOnly, dateStr); err == nil {
-					t1 = t
+					t1 = t.AddDate(0, 0, 1).Add(-time.Millisecond)
 				}
 			}
 		}

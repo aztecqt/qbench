@@ -70,12 +70,24 @@ func GetValidKlineBarsAndTimeRange(ex common.ExName, instId string) map[int][]ti
 	return result
 }
 
+// 查询本地kline数据时间范围
+func GetValidKlineTimeRange(ex common.ExName, instId string, interval int) (t0, t1 time.Time, ok bool) {
+	timeRangeByInterval := GetValidKlineBarsAndTimeRange(ex, instId)
+	if v, ok := timeRangeByInterval[interval]; ok {
+		return v[0], v[1], true
+	}
+
+	return time.Time{}, time.Time{}, false
+}
+
 // 加载k线
-func LoadKLine(t0, t1 time.Time, ex common.ExName, instId string, interval int) *common.KLine {
+func LoadKLine(t0, t1 time.Time, ex common.ExName, instId string, interval int, fnprg func(i, n int)) *common.KLine {
 	if bar, ok := common.Interval2Bar(interval); ok {
 		dt0 := util.DateOfTime(t0)
 		dt1 := util.DateOfTime(t1)
 		kline := &common.KLine{InstId: instId}
+		i := 0
+		n := int(dt1.Sub(dt0).Hours()/24) + 1
 		for d := dt0; d.Unix() <= dt1.Unix(); d = d.AddDate(0, 0, 1) {
 			path := fmt.Sprintf("%s/klines/%s/%s/%s/%s.kline", LocalDataPath, ex, bar, instId, d.Format(time.DateOnly))
 			if bf, err := LoadZipOrRawFile(path); err == nil {
@@ -88,6 +100,11 @@ func LoadKLine(t0, t1 time.Time, ex common.ExName, instId string, interval int) 
 						}
 						return ku.Time.Unix() < t1.Unix()
 					})
+			}
+
+			i++
+			if fnprg != nil {
+				fnprg(i, n)
 			}
 		}
 		return kline
