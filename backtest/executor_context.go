@@ -19,8 +19,11 @@ func (e *Executor) GetTime() time.Time {
 }
 
 func (e *Executor) GetBalance(ccy string) (decimal.Decimal, bool) {
-	if v, ok := e.balance[ccy]; ok {
-		return v, true
+	if b, ok := e.balance[ccy]; ok {
+		if u, ok := e.unrealizedPnl[ccy]; ok {
+			b = b.Add(u)
+		}
+		return b, true
 	} else {
 		return decimal.Zero, false
 	}

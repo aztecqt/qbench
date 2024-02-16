@@ -24,7 +24,8 @@ import (
 const logPrefix = "backtest"
 
 type ExecutorConfig struct {
-	// 图表的时间粒度
+	// 可视化参数
+	ShowCharts       bool  `json:"show_charts"`
 	ChartsIntervalMs int64 `json:"charts_interval_ms"`
 	chartsInterval   time.Duration
 
@@ -41,6 +42,7 @@ func (e *ExecutorConfig) parse() {
 
 func ExecutorConfigDefault() ExecutorConfig {
 	return ExecutorConfig{
+		ShowCharts:       true,
 		ChartsIntervalMs: 1000 * 60}
 }
 
@@ -104,16 +106,21 @@ func (e *Executor) SetBalance(ccy string, amount decimal.Decimal) {
 	e.balance[ccy] = amount
 }
 
-// 使用行情驱动策略和自身
-func (e *Executor) Run(s strategy) {
-	tracker := terminal.GenTrackerWithHardwareInfo("回测", float64(len(e.marketInfoSeq)), 30, true, false, true, true, false)
+// 执行策略
+// 使用行情驱动策略运行
+func (e *Executor) Run(s strategy, ex common.ExName, t0, t1 time.Time) {
+	// 加载行情
+	e.loadMarketInfo(ex, t0, t1, s.MarketInfoRequired())
 
 	// 记录初始资产
 	e.initBalance = maps.Clone(e.balance)
 
 	// 可视数据初始化
-	e.initVisualData(s)
+	if e.cfg.ShowCharts {
+		e.initVisualData(s)
+	}
 
+	tracker := terminal.GenTrackerWithHardwareInfo("回测", float64(len(e.marketInfoSeq)), 30, true, false, true, true, false)
 	for i, miu := range e.marketInfoSeq {
 		tracker.SetValue(float64(i))
 		e.Time = miu.time
@@ -189,11 +196,15 @@ func (e *Executor) Run(s strategy) {
 		}
 
 		// 可视化数据刷新
-		e.refreshVisualData(s)
+		if e.cfg.ShowCharts {
+			e.refreshVisualData(s)
+		}
 	}
 
 	// 可视化数据保存
-	e.saveVisualData(s)
+	if e.cfg.ShowCharts {
+		e.saveVisualData(s)
+	}
 
 	tracker.MarkAsDone()
 	time.Sleep(time.Millisecond * 100)

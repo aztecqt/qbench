@@ -17,33 +17,43 @@ import (
 	"github.com/aztecqt/qbench/data/local"
 )
 
+// 行情加载类型的配置
+type MarketInfoLoadingConfig struct {
+	InstIds          []string
+	Ticker           bool
+	Depth            bool
+	Trades           bool
+	Liquidations     bool
+	KlineIntervalSec int
+}
+
 // 加载指定品种的、指定时间段内的、指定类型行情
 // klineIntervalSec填0表示不需要k线
-func (e *Executor) LoadMarketInfo(
+func (e *Executor) loadMarketInfo(
 	ex common.ExName,
-	instIds []string,
 	t0, t1 time.Time,
-	ticker, depth, trades, liquidations bool, klineIntervalSec int) bool {
-	e.instIds = instIds
+	cfg MarketInfoLoadingConfig,
+) bool {
+	e.instIds = cfg.InstIds
 	e.instIdIndexs = map[string]int{}
-	for i, v := range instIds {
+	for i, v := range cfg.InstIds {
 		e.instIdIndexs[v] = i
 	}
 
 	// 估算加载进度：
 	// 加载1个文件算1分(加载1个depth算3分)，sort算1分
 	prgMax :=
-		1 + float64(len(instIds))*
-			(util.ValueIf(ticker, 1.0, 0)+
-				util.ValueIf(depth, 3.0, 0)+
-				util.ValueIf(trades, 1.0, 0)+
-				util.ValueIf(liquidations, 1.0, 0)+
-				util.ValueIf(klineIntervalSec > 0, 1.0, 0))
+		1 + float64(len(cfg.InstIds))*
+			(util.ValueIf(cfg.Ticker, 1.0, 0)+
+				util.ValueIf(cfg.Depth, 3.0, 0)+
+				util.ValueIf(cfg.Trades, 1.0, 0)+
+				util.ValueIf(cfg.Liquidations, 1.0, 0)+
+				util.ValueIf(cfg.KlineIntervalSec > 0, 1.0, 0))
 
 	tracker := terminal.GenTrackerWithHardwareInfo("行情加载", prgMax, 30, true, false, true, true, true)
 
 	// 加载数据
-	if ticker {
+	if cfg.Ticker {
 		if !e.loadTickers(t0, t1, ex, tracker) {
 			tracker.MarkAsErrored()
 			return false
@@ -51,7 +61,7 @@ func (e *Executor) LoadMarketInfo(
 		e.useTicker = true
 	}
 
-	if depth {
+	if cfg.Depth {
 		if !e.loadDepths(t0, t1, ex, tracker) {
 			tracker.MarkAsErrored()
 			return false
@@ -59,7 +69,7 @@ func (e *Executor) LoadMarketInfo(
 		e.useDepth = true
 	}
 
-	if trades {
+	if cfg.Trades {
 		if !e.loadTrades(t0, t1, ex, tracker) {
 			tracker.MarkAsErrored()
 			return false
@@ -67,7 +77,7 @@ func (e *Executor) LoadMarketInfo(
 		e.useTrades = true
 	}
 
-	if liquidations {
+	if cfg.Liquidations {
 		if !e.loadLiquidations(t0, t1, ex, tracker) {
 			tracker.MarkAsErrored()
 			return false
@@ -75,12 +85,12 @@ func (e *Executor) LoadMarketInfo(
 		e.useLiquidations = true
 	}
 
-	if klineIntervalSec > 0 {
-		if !e.loadKlines(t0, t1, ex, klineIntervalSec, tracker) {
+	if cfg.KlineIntervalSec > 0 {
+		if !e.loadKlines(t0, t1, ex, cfg.KlineIntervalSec, tracker) {
 			tracker.MarkAsErrored()
 			return false
 		}
-		e.useKline = klineIntervalSec > 0
+		e.useKline = cfg.KlineIntervalSec > 0
 	}
 
 	if e.useKline {

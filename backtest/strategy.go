@@ -22,6 +22,9 @@ type strategy interface {
 	// 基本信息
 	Class() string
 
+	// 对行情的需求
+	MarketInfoRequired() MarketInfoLoadingConfig
+
 	// 行情驱动
 	OnTicker(instId string, t common.Ticker, c Context)
 	OnDepth(instId string, d common.Depth, c Context)
